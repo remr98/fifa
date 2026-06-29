@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>World Cup 2026 Bracket Tracker</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #1e293b;
+            --accent: #2563eb;
+            --accent-hover: #3b82f6;
+            --text-main: #f8fafc;
+            --text-muted: #64748b;
+            --correct: #16a34a;
+            --incorrect: #dc2626;
+            --border: #334155;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 10px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        header { text-align: center; padding: 15px 5px; }
+        h1 { font-size: 1.5rem; margin: 0 0 5px 0; color: #f1f5f9; }
+        p.subtitle { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+
+        .api-status {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #fbbf24;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .share-banner {
+            background: #1e1b4b;
+            border: 1px solid #4338ca;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        .btn:hover { background: var(--accent-hover); }
+        .btn-locked { background: #475569; cursor: not-allowed; }
+
+        .round-tabs {
+            display: flex;
+            overflow-x: auto;
+            background: #111827;
+            padding: 5px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            gap: 5px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .tab-btn {
+            flex: 1;
+            white-space: nowrap;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .tab-btn.active { background: var(--accent); color: #fff; }
+
+        .bracket-container { display: block; width: 100%; }
+        .round-view { display: none; flex-direction: column; gap: 12px; }
+        .round-view.active { display: flex; }
+
+        .matchup {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .matchup-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            padding: 2px 4px;
+            text-transform: uppercase;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            margin-bottom: 4px;
+        }
+
+        .team {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 2px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .live-score { font-weight: bold; font-family: monospace; background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; }
+
+        .team.predicted { background-color: var(--accent); color: #fff; }
+        .team.correct { background-color: var(--correct) !important; color: #fff; }
+        .team.incorrect { background-color: var(--incorrect) !important; color: #fff; }
+
+        .badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: bold; background: rgba(0,0,0,0.3); }
+
+        .dashboard {
+            background-color: #111827;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 25px;
+        }
+
+        .score-box { display: flex; gap: 10px; }
+        .stat { flex: 1; background: var(--card-bg); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
+        .stat-val { font-size: 1.5rem; font-weight: bold; color: var(--accent-hover); }
+        .stat-lbl { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+
+        @media(min-width: 768px) {
+            .round-tabs { display: none; }
+            .bracket-container { display: flex; gap: 15px; overflow-x: auto; }
+            .round-view { display: flex !important; min-width: 220px; flex: 1; }
+            .dashboard { max-width: 500px; margin: 30px auto 0 auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🏆 World Cup 2026 Tracker</h1>
+        <p class="subtitle">Tap your winning predictions. Live tournament feeds match your accuracy.</p>
+        <div class="api-status" id="api-log">Syncing data feeds...</div>
+    </header>
+
+    <div class="share-banner">
+        <span id="lock-status-txt">Lock your bracket choices to generate a link to share and track scores with friends!</span><br>
+        <button class="btn" id="share-btn" onclick="lockAndGenerateLink()">Lock & Copy Share Link</button>
+    </div>
+
+    <div class="round-tabs" id="roundTabs">
+        <button class="tab-btn active" onclick="switchRound('r32')">R32</button>
+        <button class="tab-btn" onclick="switchRound('r16')">R16</button>
+        <button class="tab-btn" onclick="switchRound('qf')">QF</button>
+        <button class="tab-btn" onclick="switchRound('sf')">SF</button>
+        <button class="tab-btn" onclick="switchRound('f')">Finals</button>
+    </div>
+
+    <div class="bracket-container">
+        <div class="round-view active" id="view-r32"></div>
+        <div class="round-view" id="view-r16"></div>
+        <div class="round-view" id="view-qf"></div>
+        <div class="round-view" id="view-sf"></div>
+        <div class="round-view" id="view-f"></div>
+    </div>
+
+    <div class="dashboard">
+        <div class="score-box">
+            <div class="stat">
+                <div class="stat-val" id="score-pts">0</div>
+                <div class="stat-lbl">Points Scored</div>
+            </div>
+            <div class="stat">
+                <div class="stat-val" id="score-pct">0%</div>
+                <div class="stat-lbl">Prediction Accuracy</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const structuralFixtures = [
+            ["South Africa", "Canada"], ["Germany", "Paraguay"], 
+            ["Netherlands", "Morocco"], ["Brazil", "Japan"],
+            ["France", "Sweden"], ["Ivory Coast", "Norway"], 
+            ["Mexico", "Ecuador"], ["England", "DR Congo"],
+            ["USA", "Bosnia-Herzegovina"], ["Belgium", "Senegal"], 
+            ["Portugal", "Croatia"], ["Spain", "Austria"],
+            ["Switzerland", "Algeria"], ["Argentina", "Cape Verde"], 
+            ["Colombia", "Ghana"], ["Australia", "Egypt"]
+        ];
+
+        let officialLiveResults = {}; 
+        let liveScoresMap = {};
+        let userPicks = {};
+        let isLocked = false;
+
+        const config = [
+            { id: 'r32', label: 'Round of 32', matches: 16, next: 'r16' },
+            { id: 'r16', label: 'Round of 16', matches: 8, next: 'qf' },
+            { id: 'qf', label: 'Quarter-Finals', matches: 4, next: 'sf' },
+            { id: 'sf', label: 'Semi-Finals', matches: 2, next: 'f' },
+            { id: 'f', label: 'Finals', matches: 1, next: 'champion' }
+        ];
+
+        function initBracket() {
+            const r32View = document.getElementById('view-r32');
+            structuralFixtures.forEach((teams, idx) => {
+                r32View.appendChild(createMatchBlock('r32', idx, teams[0], teams[1]));
+            });
+
+            config.slice(1).forEach(step => {
+                const stepView = document.getElementById(`view-${step.id}`);
+                for (let i = 0; i < step.matches; i++) {
+                    stepView.appendChild(createMatchBlock(step.id, i, '?', '?'));
+                }
+            });
+
+            checkUrlForSharedBracket();
+            if(!isLocked) { loadUserPicks(); }
+            fetchLiveScores();
+        }
+
+        async function fetchLiveScores() {
+            const targetUrl = 'https://fixturedownload.com/feed/json/fifa-world-cup-2026';
+            
+            // Proxy Pool Array to dodge API line congestion
+            const proxies = [
+                url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+                url => `https://corsproxy.io/?${encodeURIComponent(url)}`
+            ];
+
+            let data = null;
+            
+            for(let i = 0; i < proxies.length; i++) {
+                try {
+                    const response = await fetch(proxies[i](targetUrl));
+                    if (!response.ok) continue;
+                    const wrapper = await response.json();
+                    
+                    // Parse based on proxy layout formatting styles
+                    let rawContents = wrapper.contents ? wrapper.contents : wrapper;
+                    data = typeof rawContents === "string" ? JSON.parse(rawContents) : rawContents;
+                    if(data) break;
+                } catch (err) {
+                    console.warn(`Proxy channel ${i} skipped. Trying next layer.`);
+                }
+            }
+
+            if (!data) {
+                document.getElementById('api-log').innerText = "⚠️ Direct feeds busy. Displaying saved local bracket.";
+                return;
+            }
+
+            try {
+                data.forEach((match) => {
+                    let home = match.HomeTeam;
+                    let away = match.AwayTeam;
+                    if(!home || !away) return;
+
+                    if(home === "Cabo Verde" || away === "Cabo Verde") { home = "Argentina"; away = "Cape Verde"; }
+
+                    const fixtureIdx = structuralFixtures.findIndex(f => 
+                        (f[0].toLowerCase() === home.toLowerCase() && f[1].toLowerCase() === away.toLowerCase()) ||
+                        (f[1].toLowerCase() === home.toLowerCase() && f[0].toLowerCase() === away.toLowerCase())
+                    );
+
+                    if (fixtureIdx !== -1) {
+                        const matchKey = `r32-m${fixtureIdx}`;
+                        
+                        if (match.HomeTeamScore !== null && match.AwayTeamScore !== null) {
+                            liveScoresMap[matchKey] = `${match.HomeTeamScore} - ${match.AwayTeamScore}`;
+                            
+                            // Check explicit final markers from data objects
+                            if(match.Status === "Completed" || match.Status === "Finished" || (match.HomeTeamScore !== match.AwayTeamScore)) {
+                                let winner = match.HomeTeamScore > match.AwayTeamScore ? match.HomeTeam : match.AwayTeam;
+                                if(winner === "Cabo Verde") winner = "Cape Verde";
+                                if(winner === "Bosnia & Herzegovina") winner = "Bosnia-Herzegovina";
+                                if(winner === "Congo DR") winner = "DR Congo";
+                                officialLiveResults[matchKey] = winner;
+                            }
+                        } else {
+                            liveScoresMap[matchKey] = "TBD";
+                        }
+                    }
+                });
+
+                document.getElementById('api-log').innerText = "🟢 Match Data Synchronized Successfully";
+                document.getElementById('api-log').style.color = "#16a34a";
+                updateScoresDisplay();
+                evaluateScores();
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('api-log').innerText = "⚠️ Processing error. Showing saved selections.";
+            }
+        }
+
+        function createMatchBlock(roundId, index, t1, t2) {
+            const wrap = document.createElement('div');
+            wrap.className = 'matchup';
+            wrap.id = `box-${roundId}-m${index}`;
+            wrap.innerHTML = `
+                <div class="matchup-header">
+                    <span>Match ${index + 1}</span>
+                    <span class="live-score" id="score-${roundId}-m${index}">TBD</span>
+                </div>
+                <div class="team" id="tm-${roundId}-m${index}-0" onclick="selectWinner('${roundId}', ${index}, 0)">
+                    <span class="name">${t1}</span> <span class="badge status"></span>
+                </div>
+                <div class="team" id="tm-${roundId}-m${index}-1" onclick="selectWinner('${roundId}', ${index}, 1)">
+                    <span class="name">${t2}</span> <span class="badge status"></span>
+                </div>
+            `;
+            return wrap;
+        }
+
+        function updateScoresDisplay() {
+            Object.keys(liveScoresMap).forEach(key => {
+                const el = document.getElementById(`score-${key}`);
+                if(el) el.innerText = liveScoresMap[key];
+            });
+        }
+
+        function selectWinner(roundId, matchIdx, slot) {
+            if(isLocked) return;
+
+            const element = document.getElementById(`box-${roundId}-m${matchIdx}`);
+            const teamNodes = element.querySelectorAll('.team');
+            const chosenName = teamNodes[slot].querySelector('.name').innerText;
+            if (chosenName === '?') return;
+
+            teamNodes[slot].classList.add('predicted');
+            teamNodes[1 - slot].classList.remove('predicted');
+
+            userPicks[`${roundId}-m${matchIdx}`] = chosenName;
+            localStorage.setItem('wc2026_picks', JSON.stringify(userPicks));
+
+            const currentRoundConfig = config.find(c => c.id === roundId);
+            const trackingNextRound = currentRoundConfig.next;
+
+            if (trackingNextRound !== 'champion') {
+                const nextMatchIdx = Math.floor(matchIdx / 2);
+                const nextSlotId = matchIdx % 2 === 0 ? '0' : '1';
+                const destinationNode = document.getElementById(`tm-${trackingNextRound}-m${nextMatchIdx}-${nextSlotId}`);
+                
+                if (destinationNode.querySelector('.name').innerText !== chosenName) {
+                    wipeDownstreamChoices(trackingNextRound, nextMatchIdx, nextSlotId);
+                }
+                destinationNode.querySelector('.name').innerText = chosenName;
+            }
+            evaluateScores();
+        }
+
+        function wipeDownstreamChoices(roundId, matchIdx, slotId) {
+            const node = document.getElementById(`tm-${roundId}-m${matchIdx}-${slotId}`);
+            if (!node) return;
+            node.querySelector('.name').innerText = '?';
+            node.classList.remove('predicted', 'correct', 'incorrect');
+            delete userPicks[`${roundId}-m${matchIdx}`];
+            localStorage.setItem('wc2026_picks', JSON.stringify(userPicks));
+
+            const currentRoundConfig = config.find(c => c.id === roundId);
+            if(currentRoundConfig && currentRoundConfig.next !== 'champion') {
+                const nextMatchIdx = Math.floor(matchIdx / 2);
+                const nextSlotId = matchIdx % 2 === 0 ? '0' : '1';
+                wipeDownstreamChoices(currentRoundConfig.next, nextMatchIdx, nextSlotId);
+            }
+        }
+
+        function evaluateScores() {
+            let pts = 0; let totalGraded = 0; let totalCorrect = 0;
+
+            config.forEach(round => {
+                for (let i = 0; i < round.matches; i++) {
+                    const matchKey = `${round.id}-m${i}`;
+                    const prediction = userPicks[matchKey];
+                    const actualResult = officialLiveResults[matchKey];
+
+                    const t0 = document.getElementById(`tm-${round.id}-m${i}-0`);
+                    const t1 = document.getElementById(`tm-${round.id}-m${i}-1`);
+                    if (!t0 || !t1) continue;
+
+                    [t0, t1].forEach(t => t.classList.remove('correct', 'incorrect'));
+                    t0.querySelector('.status').innerText = ''; t1.querySelector('.status').innerText = '';
+
+                    if (prediction) {
+                        const activeNode = (t0.querySelector('.name').innerText === prediction) ? t0 : t1;
+                        if (actualResult) {
+                            totalGraded++;
+                            if (prediction === actualResult) {
+                                activeNode.classList.add('correct');
+                                activeNode.querySelector('.status').innerText = '✓';
+                                pts += 10; totalCorrect++;
+                            } else {
+                                activeNode.classList.add('incorrect');
+                                activeNode.querySelector('.status').innerText = '✗';
+                            }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('score-pts').innerText = pts;
+            document.getElementById('score-pct').innerText = totalGraded > 0 ? `${Math.round((totalCorrect / totalGraded) * 100)}%` : '0%';
+        }
+
+        function lockAndGenerateLink() {
+            const pickArray = [];
+            config.forEach(round => {
+                for(let i=0; i<round.matches; i++) {
+                    pickArray.push(userPicks[`${round.id}-m${i}`] || "?");
+                }
+            });
+
+            const compressedPicks = btoa(encodeURIComponent(pickArray.join(",")));
+            const shareUrl = `${window.location.origin}${window.location.pathname}?share=${compressedPicks}`;
+            
+            navigator.clipboard.writeText(shareUrl);
+            alert("🔗 Copied! Share this exact URL link with your friends to track together.");
+        }
+
+        function checkUrlForSharedBracket() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const shareData = urlParams.get('share');
+            if(shareData) {
+                try {
+                    isLocked = true;
+                    document.getElementById('lock-status-txt').innerText = "🔒 Viewing a locked friend submission.";
+                    document.getElementById('share-btn').innerText = "Locked View";
+                    document.getElementById('share-btn').classList.add('btn-locked');
+                    document.getElementById('share-btn').disabled = true;
+
+                    const decodedRaw = decodeURIComponent(atob(shareData));
+                    const parsedPicks = decodedRaw.split(",");
+
+                    let pointer = 0;
+                    config.forEach(round => {
+                        for(let i=0; i<round.matches; i++) {
+                            const val = parsedPicks[pointer++];
+                            if(val && val !== "?") {
+                                userPicks[`${round.id}-m${i}`] = val;
+                            }
+                        }
+                    });
+                    rehydrateBracketUI();
+                } catch(e) { console.error(e); }
+            }
+        }
+
+        function rehydrateBracketUI() {
+            config.forEach(round => {
+                for(let i=0; i < round.matches; i++) {
+                    const matchKey = `${round.id}-m${i}`;
+                    const pick = userPicks[matchKey];
+                    if(pick) {
+                        const t0 = document.getElementById(`tm-${round.id}-m${i}-0`);
+                        const t1 = document.getElementById(`tm-${round.id}-m${i}-1`);
+                        
+                        if(t0 && (t0.querySelector('.name').innerText === pick || t0.querySelector('.name').innerText === '?')) {
+                            t0.querySelector('.name').innerText = pick;
+                            t0.classList.add('predicted');
+                        } else if(t1) {
+                            t1.querySelector('.name').innerText = pick;
+                            t1.classList.add('predicted');
+                        }
+                    }
+                }
+            });
+        }
+
+        function loadUserPicks() {
+            const saved = localStorage.getItem('wc2026_picks');
+            if (!saved) return;
+            userPicks = JSON.parse(saved);
+            rehydrateBracketUI();
+            
+            config.forEach(round => {
+                for(let i=0; i < round.matches; i++) {
+                    const matchKey = `${round.id}-m${i}`;
+                    const pick = userPicks[matchKey];
+                    if(pick) {
+                        const t0 = document.getElementById(`tm-${round.id}-m${i}-0`);
+                        if(t0 && t0.querySelector('.name').innerText === pick) {
+                            selectWinner(round.id, i, 0);
+                        } else {
+                            selectWinner(round.id, i, 1);
+                        }
+                    }
+                }
+            });
+        }
+
+        function switchRound(roundId) {
+            document.querySelectorAll('.round-view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`view-${roundId}`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        window.onload = initBracket;
+    </script>
+</body>
+</html>
