@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Cup 2026 Knockout Bracket & Tracker</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #0284c7;
+            --accent-hover: #0ea5e9;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --correct-color: #22c55e;
+            --incorrect-color: #ef4444;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            color: var(--accent-hover);
+        }
+
+        .instructions {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Bracket Layout */
+        .bracket-container {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding: 20px 10px;
+            align-items: center;
+            justify-content: start;
+        }
+
+        .round {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            height: 800px; /* Gives space for the bracket connectors */
+            min-width: 180px;
+        }
+
+        .round-title {
+            text-align: center;
+            font-weight: bold;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+
+        .matchup {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .team {
+            padding: 8px 12px;
+            margin: 2px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .team:hover {
+            background-color: var(--border-color);
+        }
+
+        .team.predicted-winner {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        /* Tracker / Scoring Section */
+        .dashboard {
+            max-width: 800px;
+            margin: 40px auto 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .dashboard h2 {
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .score-box {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat {
+            flex: 1;
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-hover);
+        }
+
+        /* Master Admin Panel simulation */
+        .admin-panel {
+            background: rgba(255,255,255,0.02);
+            border: 1px dashed var(--border-color);
+            padding: 15px;
+            border-radius: 6px;
+        }
+
+        .admin-panel select {
+            background: var(--bg-color);
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 5px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+
+        .results-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .result-item {
+            display: flex;
+            flex-direction: column;
+            font-size: 0.85rem;
+            background: rgba(0,0,0,0.1);
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .status-tag {
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-top: 5px;
+            text-align: center;
+        }
+        .status-correct { background-color: var(--correct-color); color: white; }
+        .status-incorrect { background-color: var(--incorrect-color); color: white; }
+        .status-pending { background-color: var(--text-muted); color: black; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>World Cup 2026 Knockout Tracker</h1>
+        <p class="instructions">Click on a team within the bracket to advance them to the next round. Use the controller below to simulate live match results and track your performance accuracy!</p>
+    </header>
+
+    <div class="bracket-container">
+        <div>
+            <div class="round-title">Round of 32</div>
+            <div class="round" id="r32">
+                </div>
+        </div>
+
+        <div>
+            <div class="round-title">Round of 16</div>
+            <div class="round" id="r16"></div>
+        </div>
+
+        <div>
+            <div class="round-title">Quarter-Finals</div>
+            <div class="round" id="qf"></div>
+        </div>
+
+        <div>
+            <div class="round-title">Semi-Finals</div>
+            <div class="round" id="sf"></div>
+        </div>
+
+        <div>
+            <div class="round-title">Finals</div>
+            <div class="round" id="f"></div>
+        </div>
+
+        <div>
+            <div class="round-title">Champion</div>
+            <div class="round" style="height: 800px; justify-content: center;">
+                <div id="champion-box" style="text-align: center; background: var(--card-bg); padding: 20px; border: 2px gold solid; border-radius: 8px; font-weight: bold;">
+                    🏆 <span id="champion-name">?</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <h2>Your Performance Tracker</h2>
+        <div class="score-box">
+            <div class="stat">
+                <div class="stat-val" id="score-points">0</div>
+                <div>Total Points</div>
+            </div>
+            <div class="stat">
+                <div class="stat-val" id="score-accuracy">0%</div>
+                <div>Accuracy Rate</div>
+            </div>
+        </div>
+
+        <div class="admin-panel">
+            <h3>🔴 Live Results Simulator (Master Key)</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px;">
+                In a real app, this data would come from a database API. Change the dropdowns below to simulate who <b>actually</b> wins the matches to test your bracket's accuracy!
+            </p>
+            <div class="results-list" id="admin-results-list">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        // 32 Initial Qualifier slots for the 2026 Expanded Knockout Structure
+        const initialTeams = [
+            "Argentina", "Canada", "Mexico", "USA", 
+            "Brazil", "Colombia", "Uruguay", "Ecuador",
+            "France", "England", "Spain", "Germany", 
+            "Portugal", "Netherlands", "Italy", "Belgium",
+            "Morocco", "Senegal", "Egypt", "Nigeria",
+            "Japan", "South Korea", "Australia", "Iran",
+            "Croatia", "Switzerland", "Denmark", "Austria",
+            "Ukraine", "Sweden", "Chile", "Peru"
+        ];
+
+        // Scoring rules: points per correct pick per round
+        const pointsPerRound = { r32: 10, r16: 20, qf: 40, sf: 80, f: 150 };
+
+        // Global states
+        let userPredictions = {}; // Format: { matchId: teamName }
+        let actualResults = {};   // Format: { matchId: teamName }
+
+        // Structure definitions for rounds
+        const roundConfigs = [
+            { id: 'r32', next: 'r16', matches: 16 },
+            { id: 'r16', next: 'qf', matches: 8 },
+            { id: 'qf', next: 'sf', matches: 4 },
+            { id: 'sf', next: 'f', matches: 2 },
+            { id: 'f', next: 'champion', matches: 1 }
+        ];
+
+        // Initialize the app
+        function init() {
+            buildRoundOf32();
+            buildEmptyRounds();
+            buildAdminPanel();
+            calculateScore();
+        }
+
+        // Build HTML for Round of 32
+        function buildRoundOf32() {
+            const r32Container = document.getElementById('r32');
+            r32Container.innerHTML = '';
+            for (let i = 0; i < 16; i++) {
+                const team1 = initialTeams[i * 2];
+                const team2 = initialTeams[i * 2 + 1];
+                const matchId = `r32-m${i}`;
+
+                r32Container.appendChild(createMatchHTML(matchId, team1, team2, 'r32', i));
+            }
+        }
+
+        // Build structural empty slots for subsequent rounds
+        function buildEmptyRounds() {
+            roundConfigs.slice(1).forEach(round => {
+                const container = document.getElementById(round.id);
+                container.innerHTML = '';
+                for (let i = 0; i < round.matches; i++) {
+                    const matchId = `${round.id}-m${i}`;
+                    container.appendChild(createMatchHTML(matchId, '?', '?', round.id, i));
+                }
+            });
+        }
+
+        // Helper to generate Match Node HTML
+        function createMatchHTML(matchId, team1, team2, roundId, matchIndex) {
+            const matchDiv = document.createElement('div');
+            matchDiv.className = 'matchup';
+            matchDiv.id = matchId;
+
+            matchDiv.innerHTML = `
+                <div class="team" id="${matchId}-t1" onclick="advanceTeam('${roundId}', ${matchIndex}, 0)">
+                    <span class="team-name">${team1}</span>
+                </div>
+                <div class="team" id="${matchId}-t2" onclick="advanceTeam('${roundId}', ${matchIndex}, 1)">
+                    <span class="team-name">${team2}</span>
+                </div>
+            `;
+            return matchDiv;
+        }
+
+        // Handle user clicking a team to advance them
+        function advanceTeam(roundId, matchIndex, teamSlot) {
+            const matchElement = document.getElementById(`${roundId}-m${matchIndex}`);
+            const t1Name = matchElement.querySelector(`#${roundId}-m${matchIndex}-t1 .team-name`).innerText;
+            const t2Name = matchElement.querySelector(`#${roundId}-m${matchIndex}-t2 .team-name`).innerText;
+            
+            if (t1Name === '?' || t2Name === '?') return; // Cannot advance empty nodes
+
+            const winner = teamSlot === 0 ? t1Name : t2Name;
+            const loserSlot = teamSlot === 0 ? 1 : 0;
+
+            // Visual toggle
+            matchElement.querySelectorAll('.team')[teamSlot].classList.add('predicted-winner');
+            matchElement.querySelectorAll('.team')[loserSlot].classList.remove('predicted-winner');
+
+            // Save prediction
+            const matchId = `${roundId}-m${matchIndex}`;
+            userPredictions[matchId] = winner;
+
+            // Find destination match in the next round
+            const nextRoundIndex = roundConfigs.findIndex(r => r.id === roundId) + 1;
+            const nextRound = roundConfigs[nextRoundIndex - 1].next;
+
+            if (nextRound === 'champion') {
+                document.getElementById('champion-name').innerText = winner;
+                userPredictions['champion'] = winner;
+            } else {
+                const nextMatchIndex = Math.floor(matchIndex / 2);
+                const nextTeamSlot = matchIndex % 2 === 0 ? 't1' : 't2';
+                const nextMatchId = `${nextRound}-m${nextMatchIndex}`;
+
+                const targetSlot = document.getElementById(`${nextMatchId}-${nextTeamSlot}`);
+                
+                // Clear old downstream values if value changed
+                if(targetSlot.querySelector('.team-name').innerText !== winner) {
+                    clearDownstream(nextRound, nextMatchIndex, nextTeamSlot);
+                }
+
+                targetSlot.querySelector('.team-name').innerText = winner;
+            }
+
+            // Sync with results engine
+            updateAdminOptions();
+            calculateScore();
+        }
+
+        // Clear choices downstream if a user changes their mind early in the bracket hierarchy
+        function clearDownstream(roundId, matchIndex, slotId) {
+            const targetSlot = document.getElementById(`${roundId}-m${matchIndex}-${slotId}`);
+            if(!targetSlot) return;
+            
+            const oldName = targetSlot.querySelector('.team-name').innerText;
+            if(oldName === '?') return;
+
+            targetSlot.querySelector('.team-name').innerText = '?';
+            targetSlot.classList.remove('predicted-winner');
+            delete userPredictions[`${roundId}-m${matchIndex}`];
+
+            const currentRoundObjIndex = roundConfigs.findIndex(r => r.id === roundId);
+            const nextRound = roundConfigs[currentRoundObjIndex].next;
+
+            if(nextRound === 'champion') {
+                document.getElementById('champion-name').innerText = '?';
+                delete userPredictions['champion'];
+            } else {
+                const nextMatchIndex = Math.floor(matchIndex / 2);
+                const nextSlotId = matchIndex % 2 === 0 ? 't1' : 't2';
+                clearDownstream(nextRound, nextMatchIndex, nextSlotId);
+            }
+        }
+
+        // Build the Live/Actual Results simulator inputs dynamically
+        function buildAdminPanel() {
+            const container = document.getElementById('admin-results-list');
+            container.innerHTML = '';
+
+            // Generate inputs for all rounds
+            roundConfigs.forEach(round => {
+                for (let i = 0; i < round.matches; i++) {
+                    const matchId = `${round.id}-m${i}`;
+                    actualResults[matchId] = ""; // default unplayed
+
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.id = `admin-item-${matchId}`;
+                    item.innerHTML = `
+                        <strong>${round.id.toUpperCase()} Match ${i+1}</strong>
+                        <select id="admin-sel-${matchId}" onchange="setActualResult('${matchId}')">
+                            <option value="">-- Select Actual Winner --</option>
+                        </select>
+                        <span class="status-tag status-pending" id="status-${matchId}">No Forecast</span>
+                    `;
+                    container.appendChild(item);
+                }
+            });
+
+            // Add final champion selector row
+            const item = document.createElement('div');
+            item.className = 'result-item';
+            item.id = `admin-item-champion`;
+            item.innerHTML = `
+                <strong>🏆 WORLD CHAMPION</strong>
+                <select id="admin-sel-champion" onchange="setActualResult('champion')">
+                    <option value="">-- Select Champion --</option>
+                </select>
+                <span class="status-tag status-pending" id="status-champion">No Forecast</span>
+            `;
+            container.appendChild(item);
+
+            updateAdminOptions();
+        }
+
+        // Update dropdown choices based on initial entries or dynamic user entries to keep simulator options clean
+        function updateAdminOptions() {
+            // Update R32 lists dynamically from initial values
+            for(let i=0; i<16; i++) {
+                const matchId = `r32-m${i}`;
+                populateSelect(matchId, [initialTeams[i*2], initialTeams[i*2+1]]);
+            }
+
+            // For advanced rounds, look at what options could possibly be chosen or are current in user view
+            roundConfigs.slice(1).forEach(round => {
+                for(let i=0; i<round.matches; i++) {
+                    const matchId = `${round.id}-m${i}`;
+                    // Allow selection from any team in our universe for simulation ease
+                    populateSelect(matchId, initialTeams); 
+                }
+            });
+            populateSelect('champion', initialTeams);
+        }
+
+        function populateSelect(matchId, teamsArr) {
+            const select = document.getElementById(`admin-sel-${matchId}`);
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">-- Actual Winner --</option>';
+            teamsArr.forEach(team => {
+                const opt = document.createElement('option');
+                opt.value = team;
+                opt.innerText = team;
+                if(team === currentVal) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        // Set simulated factual match outcome
+        function setActualResult(matchId) {
+            const select = document.getElementById(`admin-sel-${matchId}`);
+            actualResults[matchId] = select.value;
+            calculateScore();
+        }
+
+        // PERFORMANCE MATH ENGINE
+        function calculateScore() {
+            let totalPoints = 0;
+            let gradedMatchesCount = 0;
+            let correctMatchesCount = 0;
+
+            // Grade standard match items
+            roundConfigs.forEach(round => {
+                const weight = pointsPerRound[round.id];
+                for(let i=0; i<round.matches; i++) {
+                    const matchId = `${round.id}-m${i}`;
+                    const prediction = userPredictions[matchId];
+                    const actual = actualResults[matchId];
+                    const statusTag = document.getElementById(`status-${matchId}`);
+
+                    if (actual) {
+                        gradedMatchesCount++;
+                        if (prediction === actual) {
+                            totalPoints += weight;
+                            correctMatchesCount++;
+                            statusTag.innerText = "CORRECT";
+                            statusTag.className = "status-tag status-correct";
+                        } else {
+                            statusTag.innerText = "INCORRECT";
+                            statusTag.className = "status-tag status-incorrect";
+                        }
+                    } else {
+                        statusTag.innerText = prediction ? "Predicted" : "No Forecast";
+                        statusTag.className = "status-tag status-pending";
+                    }
+                }
+            });
+
+            // Grade final Champion choice
+            const champPred = userPredictions['champion'];
+            const champAct = actualResults['champion'];
+            const champStatus = document.getElementById('status-champion');
+            if (champAct) {
+                gradedMatchesCount++;
+                if (champPred === champAct) {
+                    totalPoints += 200; // Special bonus score for exact champion
+                    correctMatchesCount++;
+                    champStatus.innerText = "CORRECT CHAMPION!";
+                    champStatus.className = "status-tag status-correct";
+                } else {
+                    champStatus.innerText = "INCORRECT";
+                    champStatus.className = "status-tag status-incorrect";
+                }
+            } else {
+                champStatus.innerText = champPred ? "Predicted" : "No Forecast";
+                champStatus.className = "status-tag status-pending";
+            }
+
+            // Update DOM panels
+            document.getElementById('score-points').innerText = totalPoints;
+            const accuracy = gradedMatchesCount > 0 ? Math.round((correctMatchesCount / gradedMatchesCount) * 100) : 0;
+            document.getElementById('score-accuracy').innerText = `${accuracy}%`;
+        }
+
+        // Trigger compilation on windows asset load
+        window.onload = init;
+    </script>
+</body>
+</html>
