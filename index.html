@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live World Cup 2026 Bracket Tracker</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #1e293b;
+            --accent: #2563eb;
+            --accent-hover: #3b82f6;
+            --text-main: #f8fafc;
+            --text-muted: #64748b;
+            --correct: #16a34a;
+            --incorrect: #dc2626;
+            --live-pulse: #ef4444;
+            --border: #334155;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 10px 10px 110px 10px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        header { text-align: center; padding: 15px 5px; }
+        h1 { font-size: 1.5rem; margin: 0 0 5px 0; color: #f1f5f9; }
+        p.subtitle { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+
+        .api-status {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #fbbf24;
+            margin-bottom: 10px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--live-pulse);
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.5; }
+        }
+
+        .share-banner {
+            background: #1e1b4b;
+            border: 1px solid #4338ca;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        .btn:hover { background: var(--accent-hover); }
+        .btn-locked { background: #475569; cursor: not-allowed; }
+
+        .round-tabs {
+            display: flex;
+            overflow-x: auto;
+            background: #111827;
+            padding: 5px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            gap: 5px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .tab-btn {
+            flex: 1;
+            white-space: nowrap;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .tab-btn.active { background: var(--accent); color: #fff; }
+
+        .bracket-container { display: block; width: 100%; }
+        .round-view { display: none; flex-direction: column; gap: 12px; }
+        .round-view.active { display: flex; }
+
+        .matchup {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.2s ease;
+        }
+
+        .matchup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            padding: 2px 4px;
+            text-transform: uppercase;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            margin-bottom: 4px;
+        }
+
+        .live-time {
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.65rem;
+        }
+
+        .team {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 2px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            background: rgba(255,255,255,0.02);
+            border: 2px solid transparent;
+            transition: all 0.15s ease;
+        }
+
+        .team-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .text-stack {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .actual-correction {
+            font-size: 0.7rem;
+            font-style: italic;
+            color: #94a3b8;
+            margin-top: 1px;
+        }
+
+        .flag {
+            font-size: 1.1rem;
+            display: inline-block;
+            width: 24px;
+            text-align: center;
+        }
+
+        .live-score { font-weight: bold; font-family: monospace; background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; color: #fff; }
+        .penalty-tag { color: #f59e0b; font-size: 0.7rem; font-weight: 800; margin-left: 4px; }
+
+        .team.predicted { background-color: rgba(37, 99, 235, 0.3); border-color: var(--accent); }
+        .team.correct-pick { background-color: rgba(22, 163, 74, 0.25) !important; border-color: var(--correct) !important; color: #fff; }
+        .team.incorrect-pick { background-color: rgba(220, 38, 38, 0.2) !important; border-color: var(--incorrect) !important; }
+        .team.eliminated-loser { opacity: 0.4; filter: grayscale(30%); }
+
+        .dashboard {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #111827;
+            border-top: 2px solid var(--border);
+            padding: 12px 15px;
+            z-index: 1000;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.4);
+        }
+
+        .score-box { display: flex; gap: 10px; max-width: 600px; margin: 0 auto; }
+        .stat { flex: 1; background: var(--card-bg); padding: 10px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
+        .stat-val { font-size: 1.3rem; font-weight: bold; color: var(--accent-hover); }
+        .stat-lbl { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+
+        @media(min-width: 768px) {
+            body { padding-bottom: 30px; }
+            .round-tabs { display: none; }
+            .bracket-container { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 80px; }
+            .round-view { display: flex !important; min-width: 220px; flex: 1; }
+            .dashboard { border-top: 1px solid var(--border); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🏆 World Cup 2026 Bracket Tracker</h1>
+        <p class="subtitle">Real-time telemetry feeds, adaptive kickoff clocks, and localized correction mechanics.</p>
+        <div class="api-status" id="api-log"><span class="pulse-dot"></span>Connecting to feed...</div>
+    </header>
+
+    <div class="share-banner">
+        <span id="lock-status-txt">Lock your bracket choices to generate a link to share and track scores with family/friends!</span><br>
+        <button class="btn" id="share-btn" onclick="lockAndGenerateLink()">Lock & Copy Share Link</button>
+    </div>
+
+    <div class="round-tabs" id="roundTabs">
+        <button class="tab-btn active" onclick="switchRound('r32')">R32</button>
+        <button class="tab-btn" onclick="switchRound('r16')">R16</button>
+        <button class="tab-btn" onclick="switchRound('qf')">QF</button>
+        <button class="tab-btn" onclick="switchRound('sf')">SF</button>
+        <button class="tab-btn" onclick="switchRound('f')">Finals</button>
+    </div>
+
+    <div class="bracket-container">
+        <div class="round-view active" id="view-r32"></div>
+        <div class="round-view" id="view-r16"></div>
+        <div class="round-view" id="view-qf"></div>
+        <div class="round-view" id="view-sf"></div>
+        <div class="round-view" id="view-f"></div>
+    </div>
+
+    <div class="dashboard">
+        <div class="score-box">
+            <div class="stat">
+                <div class="stat-val" id="score-pts">0</div>
+                <div class="stat-lbl">Points Scored</div>
+            </div>
+            <div class="stat">
+                <div class="stat-val" id="score-pct">0%</div>
+                <div class="stat-lbl">Prediction Accuracy</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const structuralFixtures = [
+            ["South Africa", "Canada"], ["Netherlands", "Morocco"],
+            ["Germany", "Paraguay"], ["France", "Sweden"],
+            ["Brazil", "Japan"], ["Ivory Coast", "Norway"],
+            ["Mexico", "Ecuador"], ["England", "DR Congo"],
+            ["Portugal", "Croatia"], ["Spain", "Austria"],
+            ["USA", "Bosnia-Herzegovina"], ["Belgium", "Senegal"],
+            ["Argentina", "Cape Verde"], ["Australia", "Egypt"],
+            ["Switzerland", "Algeria"], ["Colombia", "Ghana"]
+        ];
+
+        const matchLabels = {
+            'r32': [73, 75, 74, 77, 76, 78, 79, 80, 83, 84, 81, 82, 85, 86, 87, 88],
+            'r16': [89, 90, 91, 92, 94, 93, 95, 96],
+            'qf': [97, 98, 99, 100],
+            'sf': [101, 102],
+            'f': [104]
+        };
+
+        const flagLookup = {
+            "South Africa": "🇿🇦", "Canada": "🇨🇦", "Germany": "🇩🇪", "Paraguay": "🇵🇾",
+            "Netherlands": "🇳🇱", "Morocco": "🇲🇦", "Brazil": "🇧🇷", "Japan": "🇯🇵",
+            "France": "🇫🇷", "Sweden": "🇸🇪", "Ivory Coast": "🇨🇮", "Norway": "🇳🇴",
+            "Mexico": "🇲🇽", "Ecuador": "🇪🇨", "England": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "DR Congo": "🇨🇩",
+            "USA": "🇺🇸", "Bosnia-Herzegovina": "🇧🇦", "Belgium": "🇧🇪", "Senegal": "🇸🇳",
+            "Portugal": "🇵🇹", "Croatia": "🇭🇷", "Spain": "🇪🇸", "Austria": "🇦🇹",
+            "Switzerland": "🇨🇭", "Algeria": "🇩🇿", "Argentina": "🇦🇷", "Cape Verde": "🇨🇻",
+            "Colombia": "🇨🇴", "Ghana": "🇬🇭", "Australia": "🇦🇺", "Egypt": "🇪🇬",
+            "?": "🏳️"
+        };
+
+        const normalizationMap = {
+            "united states": "USA", "usmnt": "USA", "bosnia": "Bosnia-Herzegovina", 
+            "congo dr": "DR Congo", "ivory coast": "Ivory Coast", "cote d'ivoire": "Ivory Coast",
+            "cape verde": "Cape Verde", "cabo verde": "Cape Verde"
+        };
+
+        let officialLiveResults = {}; 
+        let liveScoresMap = {};
+        let liveClocksMap = {};
+        let userPicks = {};
+        let isLocked = false;
+
+        const config = [
+            { id: 'r32', label: 'Round of 32', matches: 16, next: 'r16' },
+            { id: 'r16', label: 'Round of 16', matches: 8, next: 'qf' },
+            { id: 'qf', label: 'Quarter-Finals', matches: 4, next: 'sf' },
+            { id: 'sf', label: 'Semi-Finals', matches: 2, next: 'f' },
+            { id: 'f', label: 'Finals', matches: 1, next: 'champion' }
+        ];
+
+        function initBracket() {
+            const r32View = document.getElementById('view-r32');
+            structuralFixtures.forEach((teams, idx) => {
+                r32View.appendChild(createMatchBlock('r32', idx, teams[0], teams[1]));
+            });
+
+            config.slice(1).forEach(step => {
+                const stepView = document.getElementById(`view-${step.id}`);
+                for (let i = 0; i < step.matches; i++) {
+                    stepView.appendChild(createMatchBlock(step.id, i, '?', '?'));
+                }
+            });
+
+            checkUrlForSharedBracket();
+            if(!isLocked) { loadUserPicks(); }
+            
+            fetchESPNLiveFeeds();
+            setInterval(fetchESPNLiveFeeds, 45000);
+        }
+
+        function normalizeName(name) {
+            if(!name) return "";
+            const clean = name.toLowerCase().replace(" national team", "").replace(" men's national soccer team", "").trim();
+            return normalizationMap[clean] || name;
+        }
+
+        function formatToAdaptiveLocalTime(isoString) {
+            try {
+                const userLocale = navigator.language || 'en-US';
+                const mainOptions = { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true };
+                const zoneNameOptions = { timeZoneName: 'short' };
+                
+                const dateObj = new Date(isoString);
+                const localTimeString = dateObj.toLocaleString(userLocale, mainOptions).replace(',', '');
+                const timezoneSuffix = dateObj.toLocaleString(userLocale, zoneNameOptions).split(' ').pop();
+                
+                return `${localTimeString} ${timezoneSuffix}`;
+            } catch (e) {
+                return "TBD";
+            }
+        }
+
+        async function fetchESPNLiveFeeds() {
+            const targetUrl = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260611-20260719';
+            
+            try {
+                let data = null;
+                try {
+                    const directRes = await fetch(targetUrl);
+                    if(directRes.ok) data = await directRes.json();
+                } catch(corsErr) {
+                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}&timestamp=${new Date().getTime()}`;
+                    const proxyRes = await fetch(proxyUrl);
+                    if (proxyRes.ok) {
+                        const wrapper = await proxyRes.json();
+                        data = typeof wrapper.contents === "string" ? JSON.parse(wrapper.contents) : wrapper.contents;
+                    }
+                }
+
+                if (!data || !data.events) return;
+
+                data.events.forEach(event => {
+                    const statusType = event.status.type.state; 
+                    const displayClock = event.status.type.detail; 
+                    const rawDateIso = event.date; 
+                    
+                    const competitors = event.competitions[0].competitors;
+                    const homeNode = competitors.find(c => c.homeAway === 'home');
+                    const awayNode = competitors.find(c => c.homeAway === 'away');
+
+                    const homeName = normalizeName(homeNode.team.displayName);
+                    const awayName = normalizeName(awayNode.team.displayName);
+
+                    const matchIdx = structuralFixtures.findIndex(f => 
+                        (normalizeName(f[0]) === homeName && normalizeName(f[1]) === awayName) ||
+                        (normalizeName(f[1]) === homeName && normalizeName(f[0]) === awayName)
+                    );
+
+                    if (matchIdx !== -1) {
+                        const matchKey = `r32-m${matchIdx}`;
+                        let hScore = homeNode.score;
+                        let aScore = awayNode.score;
+                        
+                        if(event.competitions[0].attendance === 0 || displayClock.includes("PEN") || homeNode.shootoutScore !== undefined) {
+                            const hPens = homeNode.shootoutScore || 0;
+                            const aPens = awayNode.shootoutScore || 0;
+                            if(hPens > 0 || aPens > 0) {
+                                hScore += ` (${hPens} PEN)`;
+                                aScore += ` (${aPens} PEN)`;
+                            }
+                        }
+
+                        const name0Node = document.getElementById(`name-r32-m${matchIdx}-0`);
+                        if (name0Node && normalizeName(name0Node.innerText) === homeName) {
+                            liveScoresMap[matchKey] = `${hScore}__${aScore}`;
+                        } else {
+                            liveScoresMap[matchKey] = `${aScore}__${hScore}`;
+                        }
+                        
+                        if (statusType === "in") {
+                            liveClocksMap[matchKey] = displayClock;
+                        } else if (statusType === "post") {
+                            liveClocksMap[matchKey] = "FT";
+                            let finalWinner = homeNode.winner ? homeNode.team.displayName : awayNode.team.displayName;
+                            if(!homeNode.winner && !awayNode.winner) {
+                                const parseHome = parseInt(homeNode.score) || 0;
+                                const parseAway = parseInt(awayNode.score) || 0;
+                                if(parseHome === parseAway) {
+                                    finalWinner = (homeNode.shootoutScore || 0) > (awayNode.shootoutScore || 0) ? homeNode.team.displayName : awayNode.team.displayName;
+                                } else {
+                                    finalWinner = parseHome > parseAway ? homeNode.team.displayName : awayNode.team.displayName;
+                                }
+                            }
+                            officialLiveResults[matchKey] = normalizeName(finalWinner);
+                        } else {
+                            liveClocksMap[matchKey] = formatToAdaptiveLocalTime(rawDateIso);
+                        }
+                    }
+                });
+
+                document.getElementById('api-log').innerHTML = `<span class="pulse-dot" style="background:#16a34a"></span> Engine Synchronized`;
+                document.getElementById('api-log').style.color = "#16a34a";
+                
+                updateInterfaceLiveTelemetry();
+                rehydrateBracketUI();
+
+            } catch (error) {
+                console.error("Telemetry structural dropout handled:", error);
+                document.getElementById('api-log').innerHTML = "⚠️ Live feed latency protection enabled...";
+                document.getElementById('api-log').style.color = "#fbbf24";
+            }
+        }
+
+        function createMatchBlock(roundId, index, t1, t2) {
+            const wrap = document.createElement('div');
+            wrap.className = 'matchup';
+            wrap.id = `box-${roundId}-m${index}`;
+            
+            const flag1 = flagLookup[t1] || "🏳️";
+            const flag2 = flagLookup[t2] || "🏳️";
+            const displayNum = matchLabels[roundId] ? matchLabels[roundId][index] : index + 1;
+
+            wrap.innerHTML = `
+                <div class="matchup-header">
+                    <span>Match ${displayNum}</span>
+                    <span class="live-time" id="clock-${roundId}-m${index}">TBD</span>
+                </div>
+                <div class="team" id="tm-${roundId}-m${index}-0" onclick="selectWinner('${roundId}', ${index}, 0)">
+                    <div class="team-info">
+                        <span class="flag" id="flag-${roundId}-m${index}-0">${flag1}</span>
+                        <div class="text-stack">
+                            <span class="name" id="name-${roundId}-m${index}-0">${t1}</span>
+                            <span class="actual-correction" id="actual-${roundId}-m${index}-0" style="display:none;"></span>
+                        </div>
+                    </div>
+                    <span class="live-score" id="score-${roundId}-m${index}-0">0</span>
+                </div>
+                <div class="team" id="tm-${roundId}-m${index}-1" onclick="selectWinner('${roundId}', ${index}, 1)">
+                    <div class="team-info">
+                        <span class="flag" id="flag-${roundId}-m${index}-1">${flag2}</span>
+                        <div class="text-stack">
+                            <span class="name" id="name-${roundId}-m${index}-1">${t2}</span>
+                            <span class="actual-correction" id="actual-${roundId}-m${index}-1" style="display:none;"></span>
+                        </div>
+                    </div>
+                    <span class="live-score" id="score-${roundId}-m${index}-1">0</span>
+                </div>
+            `;
+            return wrap;
+        }
+
+        function updateInterfaceLiveTelemetry() {
+            Object.keys(liveScoresMap).forEach(key => {
+                const scores = liveScoresMap[key].split("__");
+                const s0 = document.getElementById(`score-${key}-0`);
+                const s1 = document.getElementById(`score-${key}-1`);
+                const clk = document.getElementById('clock-' + key);
+                
+                if(s0 && s1) {
+                    s0.innerHTML = scores[0].includes("PEN") ? scores[0].replace("(", '<span class="penalty-tag">').replace(")", '</span>') : scores[0];
+                    s1.innerHTML = scores[1].includes("PEN") ? scores[1].replace("(", '<span class="penalty-tag">').replace(")", '</span>') : scores[1];
+                }
+                if(clk && liveClocksMap[key]) {
+                    const statusText = liveClocksMap[key];
+                    clk.innerText = statusText;
+                    
+                    if (statusText !== "TBD" && statusText !== "FT" && !statusText.match(/[A-Z]{3,4}$|GMT/)) {
+                        clk.style.background = "rgba(239, 68, 68, 0.15)";
+                        clk.style.color = "#ef4444";
+                    } else {
+                        clk.style.background = "rgba(255,255,255,0.05)";
+                        clk.style.color = "var(--text-muted)";
+                    }
+                }
+            });
+        }
+
+        function selectWinner(roundId, matchIdx, slot) {
+            if(isLocked) return;
+
+            const chosenName = document.getElementById(`name-${roundId}-m${matchIdx}-${slot}`).innerText;
+            if (chosenName === '?') return;
+
+            const t0 = document.getElementById(`tm-${roundId}-m${matchIdx}-0`);
+            const t1 = document.getElementById(`tm-${roundId}-m${matchIdx}-1`);
+            
+            if(slot === 0) {
+                t0.classList.add('predicted');
+                t1.classList.remove('predicted');
+            } else {
+                t1.classList.add('predicted');
+                t0.classList.remove('predicted');
+            }
+
+            userPicks[`${roundId}-m${matchIdx}`] = chosenName;
+            localStorage.setItem('wc2026_picks', JSON.stringify(userPicks));
+
+            rehydrateBracketUI();
+        }
+
+        function getActualWinnerOfMatch(roundId, matchIdx) {
+            if (roundId === 'r32') {
+                return officialLiveResults[`r32-m${matchIdx}`] || null;
+            }
+            const pWinner0 = getActualWinnerOfMatch(config[config.findIndex(c=>c.id===roundId)-1].id, matchIdx * 2);
+            const pWinner1 = getActualWinnerOfMatch(config[config.findIndex(c=>c.id===roundId)-1].id, matchIdx * 2 + 1);
+            
+            if (!pWinner0 || !pWinner1) return null;
+            
+            const clkNode = document.getElementById(`clock-${roundId}-m${matchIdx}`);
+            if (clkNode && clkNode.innerText === 'FT') {
+                const n0 = document.getElementById(`name-${roundId}-m${matchIdx}-0`).innerText;
+                const n1 = document.getElementById(`name-${roundId}-m${matchIdx}-1`).innerText;
+                return (n0 === pWinner0 || n0 === pWinner1) ? n0 : n1; 
+            }
+            return null;
+        }
+
+        function evaluateScores() {
+            let pts = 0; let totalGraded = 0; let totalCorrect = 0;
+            let deadTeamsList = new Set();
+
+            // First pass: scan R32 results to collect definitely eliminated teams
+            for (let i = 0; i < 16; i++) {
+                const actual = officialLiveResults[`r32-m${i}`];
+                if (actual) {
+                    const fixture = structuralFixtures[i];
+                    const loser = (normalizeName(fixture[0]) === actual) ? normalizeName(fixture[1]) : normalizeName(fixture[0]);
+                    deadTeamsList.add(loser);
+                }
+            }
+
+            config.forEach((round, roundIdx) => {
+                for (let i = 0; i < round.matches; i++) {
+                    const matchKey = `${round.id}-m${i}`;
+                    const prediction = userPicks[matchKey];
+                    
+                    const t0 = document.getElementById(`tm-${round.id}-m${i}-0`);
+                    const t1 = document.getElementById(`tm-${round.id}-m${i}-1`);
+                    const n0Node = document.getElementById(`name-${round.id}-m${i}-0`);
+                    const n1Node = document.getElementById(`name-${round.id}-m${i}-1`);
+                    const act0 = document.getElementById(`actual-${round.id}-m${i}-0`);
+                    const act1 = document.getElementById(`actual-${round.id}-m${i}-1`);
+                    
+                    if (!t0 || !t1) continue;
+                    
+                    t0.classList.remove('correct-pick', 'incorrect-pick', 'eliminated-loser', 'predicted');
+                    t1.classList.remove('correct-pick', 'incorrect-pick', 'eliminated-loser', 'predicted');
+                    act0.style.display = "none";
+                    act1.style.display = "none";
+
+                    const name0 = n0Node.innerText;
+                    const name1 = n1Node.innerText;
+
+                    // Compute true structural outcomes from prior real legs
+                    let realLegWinner0 = null;
+                    let realLegWinner1 = null;
+                    if (round.id !== 'r32') {
+                        const prevRoundId = config[roundIdx - 1].id;
+                        realLegWinner0 = getActualWinnerOfMatch(prevRoundId, i * 2);
+                        realLegWinner1 = getActualWinnerOfMatch(prevRoundId, i * 2 + 1);
+                    }
+
+                    // Adaptive context label deployment
+                    if (round.id !== 'r32' && isLocked) {
+                        if (realLegWinner0 && name0 !== '?' && name0 !== realLegWinner0) {
+                            act0.innerText = `Actual: ${realLegWinner0}`;
+                            act0.style.display = "block";
+                        }
+                        if (realLegWinner1 && name1 !== '?' && name1 !== realLegWinner1) {
+                            act1.innerText = `Actual: ${realLegWinner1}`;
+                            act1.style.display = "block";
+                        }
+                    }
+
+                    // Resolve the actual live winner of this specific node match
+                    let actualResult = getActualWinnerOfMatch(round.id, i);
+
+                    if (actualResult) {
+                        const loserName = (actualResult === name0) ? name1 : name0;
+                        if(name0 === loserName) t0.classList.add('eliminated-loser');
+                        if(name1 === loserName) t1.classList.add('eliminated-loser');
+                        
+                        if (prediction) {
+                            totalGraded++;
+                            const activeNode = (name0 === prediction) ? t0 : t1;
+                            if (prediction === actualResult) {
+                                activeNode.classList.add('correct-pick');
+                                pts += (10 * Math.pow(2, roundIdx)); 
+                                totalCorrect++;
+                            } else {
+                                activeNode.classList.add('incorrect-pick');
+                            }
+                        }
+                        // Update our eliminated catalog tracking loop
+                        deadTeamsList.add(loserName);
+                    } else {
+                        // De Facto Auto-Fail Pipeline check
+                        if (prediction) {
+                            if (deadTeamsList.has(prediction)) {
+                                totalGraded++;
+                                const activeNode = (name0 === prediction) ? t0 : t1;
+                                activeNode.classList.add('incorrect-pick');
+                            } else {
+                                const activeNode = (name0 === prediction) ? t0 : t1;
+                                activeNode.classList.add('predicted');
+                            }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('score-pts').innerText = pts;
+            document.getElementById('score-pct').innerText = totalGraded > 0 ? `${Math.round((totalCorrect / totalGraded) * 100)}%` : '0%';
+        }
+
+        function rehydrateBracketUI() {
+            config.forEach((round, roundIdx) => {
+                for(let i=0; i < round.matches; i++) {
+                    const n0 = document.getElementById(`name-${round.id}-m${i}-0`);
+                    const n1 = document.getElementById(`name-${round.id}-m${i}-1`);
+                    const f0 = document.getElementById(`flag-${round.id}-m${i}-0`);
+                    const f1 = document.getElementById(`flag-${round.id}-m${i}-1`);
+                    
+                    if (round.id === 'r32') {
+                        const p0 = userPicks[`r32-m${i}`];
+                        const tBlock0 = document.getElementById(`tm-r32-m${i}-0`);
+                        const tBlock1 = document.getElementById(`tm-r32-m${i}-1`);
+                        if (p0) {
+                            if (n0 && n0.innerText === p0) tBlock0.classList.add('predicted');
+                            if (n1 && n1.innerText === p0) tBlock1.classList.add('predicted');
+                        }
+                    } else {
+                        const prevRoundId = config[roundIdx - 1].id;
+                        
+                        // Structural recovery paths for standard locks vs dynamic selections
+                        let pName0 = "?";
+                        let pName1 = "?";
+                        
+                        if (isLocked) {
+                            pName0 = userPicks[`${prevRoundId}-m${i * 2}`] || "?";
+                            pName1 = userPicks[`${prevRoundId}-m${i * 2 + 1}`] || "?";
+                        } else {
+                            pName0 = userPicks[`${prevRoundId}-m${i * 2}`] || document.getElementById(`name-${prevRoundId}-m${i * 2}-0`).innerText;
+                            const pPick0 = userPicks[`${prevRoundId}-m${i * 2}`];
+                            if (!pPick0) pName0 = "?";
+
+                            pName1 = userPicks[`${prevRoundId}-m${i * 2 + 1}`] || document.getElementById(`name-${prevRoundId}-m${i * 2 + 1}-0`).innerText;
+                            const pPick1 = userPicks[`${prevRoundId}-m${i * 2 + 1}`];
+                            if (!pPick1) pName1 = "?";
+                        }
+
+                        if(n0) { n0.innerText = pName0; f0.innerText = flagLookup[pName0] || "🏳️"; }
+                        if(n1) { n1.innerText = pName1; f1.innerText = flagLookup[pName1] || "🏳️"; }
+                    }
+                }
+            });
+            evaluateScores();
+        }
+
+        function lockAndGenerateLink() {
+            const pickArray = [];
+            config.forEach(round => {
+                for(let i=0; i<round.matches; i++) {
+                    pickArray.push(userPicks[`${round.id}-m${i}`] || "?");
+                }
+            });
+
+            const compressedPicks = btoa(encodeURIComponent(pickArray.join(",")));
+            const shareUrl = `${window.location.origin}${window.location.pathname}?share=${compressedPicks}`;
+            
+            navigator.clipboard.writeText(shareUrl);
+            alert("🔗 Copied! Share this exact URL link with your family/friends to track together.");
+        }
+
+        function checkUrlForSharedBracket() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const shareData = urlParams.get('share');
+            if(shareData) {
+                try {
+                    isLocked = true;
+                    document.getElementById('lock-status-txt').innerText = "🔒 Viewing a locked family/friends submission.";
+                    document.getElementById('share-btn').innerText = "Locked View";
+                    document.getElementById('share-btn').classList.add('btn-locked');
+                    document.getElementById('share-btn').disabled = true;
+
+                    const decodedRaw = decodeURIComponent(atob(shareData));
+                    const parsedPicks = decodedRaw.split(",");
+
+                    let pointer = 0;
+                    config.forEach(round => {
+                        for(let i=0; i<round.matches; i++) {
+                            const val = parsedPicks[pointer++];
+                            if(val && val !== "?") {
+                                userPicks[`${round.id}-m${i}`] = val;
+                            }
+                        }
+                    });
+                } catch(e) { console.error(e); }
+            }
+        }
+
+        function loadUserPicks() {
+            const saved = localStorage.getItem('wc2026_picks');
+            if (!saved) return;
+            userPicks = JSON.parse(saved);
+        }
+
+        function switchRound(roundId) {
+            document.querySelectorAll('.round-view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`view-${roundId}`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        window.onload = initBracket;
+    </script>
+</body>
+</html>
